@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { jwtVerify } from 'jose';
 
 const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/register'];
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Allow public paths and Next.js internals
@@ -12,14 +12,18 @@ export function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get('token')?.value;
-  const payload = token ? verifyToken(token) : null;
 
-  if (!payload) {
-    const loginUrl = new URL('/login', req.url);
-    return NextResponse.redirect(loginUrl);
+  if (!token) {
+    return NextResponse.redirect(new URL('/login', req.url));
   }
 
-  return NextResponse.next();
+  try {
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
+    await jwtVerify(token, secret);
+    return NextResponse.next();
+  } catch {
+    return NextResponse.redirect(new URL('/login', req.url));
+  }
 }
 
 export const config = {
